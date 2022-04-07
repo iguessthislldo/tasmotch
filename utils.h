@@ -4,11 +4,12 @@ struct Input {
     static const unsigned long debounce_delay = 100;
 
     const int pin;
+    bool active_high = true;
     unsigned long last_change = 0;
     bool value = false;
 
     bool raw_value() {
-        return digitalRead(pin) == HIGH;
+        return active_high == (digitalRead(pin) == HIGH);
     }
 
     void init() {
@@ -117,6 +118,7 @@ char* append_to_string(char* d, const char* s, char omit = '\0') {
     *d = '\0';
     return d;
 }
+
 enum class ControlMode {
     OnOff,
     OnOnly,
@@ -172,19 +174,19 @@ public:
     };
 
     Switch* next;
+    Input input;
 
 private:
     Type type;
     const char* name;
-    Input input;
     DeviceList find_device_list;
     DeviceList found_device_list;
 
 public:
     Switch(Type type, const char* name, int pin)
-    : type(type)
+    : input{pin}
+    , type(type)
     , name(name)
-    , input{pin}
     {
         all_switches.add(this);
     }
