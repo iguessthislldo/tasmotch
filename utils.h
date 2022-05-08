@@ -127,7 +127,9 @@ enum class ControlMode {
 
 struct Device {
     String name;
+    bool is_tasmota;
     ControlMode control_mode;
+    String payload = "";
     Device* next = nullptr;
 };
 
@@ -141,7 +143,7 @@ struct DeviceList : public List<Device> {
         return nullptr;
     }
 
-    Device* add(const char* name, ControlMode control_mode) {
+    Device* add(const char* name, ControlMode control_mode, const char* payload = nullptr) {
         Device* d = find(name);
         if (d) {
             Serial.print("Already have ");
@@ -150,7 +152,10 @@ struct DeviceList : public List<Device> {
         }
         Serial.print("Adding ");
         Serial.println(name);
-        d = new Device{name, control_mode};
+        d = new Device{name, payload == nullptr, control_mode};
+        if (payload) {
+            d->payload = payload;
+        }
         List<Device>::add(d);
         return d;
     }
@@ -207,6 +212,10 @@ public:
         }
     }
 
+    void add_raw_mqtt_device(const char* topic, const char* payload, ControlMode control_mode) {
+        found_device_list.add(topic, control_mode, payload);
+    }
+
     enum class Cmd {
         On,
         Off,
@@ -248,16 +257,25 @@ public:
                     continue;
                 }
 
-                topic_buffer[0] = '\0';
-                append_to_string(
+                const char* topic;
+                const char* payload;
+                if (d->is_tasmota) {
+                    topic_buffer[0] = '\0';
                     append_to_string(
-                        append_to_string(topic_buffer, "cmnd/"),
-                        d->name.c_str()),
-                    "/Power");
-                Serial.print(topic_buffer);
+                        append_to_string(
+                            append_to_string(topic_buffer, "cmnd/"),
+                            d->name.c_str()),
+                        "/Power");
+                    topic = &topic_buffer[0];
+                    payload = cmd_str;
+                } else { // Raw MQTT Device
+                    topic = d->name.c_str();
+                    payload = d->payload.c_str();
+                }
+                Serial.print(topic);
                 Serial.print(" ");
-                Serial.println(cmd_str);
-                mqtt.publish(topic_buffer, cmd_str);
+                Serial.println(payload);
+                mqtt.publish(topic, payload);
             }
         }
     }
